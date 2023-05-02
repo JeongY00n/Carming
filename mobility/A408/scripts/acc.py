@@ -51,7 +51,6 @@ class Gear(Enum):
 class pure_pursuit:
     def __init__(self):
         rospy.init_node('pure_pursuit', anonymous=True)
-
         # TODO: (1) Global/Local Path Odometry Object/Ego Status CtrlCmd subscriber, publisher 선언
         ## 값이 변함과 동시에 callback 함수 내에서 값이 변경
         rospy.Subscriber("/global_path", Path, self.global_path_callback)
@@ -101,20 +100,23 @@ class pure_pursuit:
         ## 승차 확인이 안되면 정차, 승차 확인하면 주행 시작
         self.get_in = ''
         self.send_gear_cmd(Gear.P.value)
+        self.tour_start = redis_client.get('tour_start ')
+        self.get_in = redis_client.get('get_in')
+        print(self.tour_start, self.get_in )
         while True:
             ## 여정 시작 확인, 승차 확인
-            self.tour_start = redis_client.get('tour_start')
+            self.tour_start = redis_client.get('tour_start ')
             self.get_in = redis_client.get('get_in')
 
             ## 여정이 시작됨을 확인하면 탑승 장소로 이동
-            if self.tour_start == b'1' or self.get_in == b'0':
+            if self.tour_start == b'1':
                 self.send_gear_cmd(Gear.D.value)
                 break
 
             ## 승차 확인 후에 안내 메세지가 끝났다면 주행 시작
             if self.get_in == b'1':
                 ## 안내메세지 10초 이후에 출발
-                time.slee(10)
+                time.sleep(10)
                 self.send_gear_cmd(Gear.D.value)
                 break
 
@@ -152,6 +154,8 @@ class pure_pursuit:
                 self.current_waypoint = self.get_current_waypoint([self.current_postion.x, self.current_postion.y],
                                                                   self.global_path)
                 self.target_velocity = self.velocity_list[self.current_waypoint] * 3.6
+                
+                
 
                 steering = self.calc_pure_pursuit()
                 if self.is_look_forward_point:
@@ -173,6 +177,7 @@ class pure_pursuit:
                 output = self.pid.pid(self.target_velocity, self.status_msg.velocity.x * 3.6)
 
                 if output > 0.0:
+
                     self.ctrl_cmd_msg.accel = output
                     self.ctrl_cmd_msg.brake = 0.0
                     ### redis_client.set('current_gear', 4)  ## 주행
@@ -183,12 +188,16 @@ class pure_pursuit:
 
                 # TODO: (10) 제어입력 메세지 Publish
                 self.ctrl_cmd_pub.publish(self.ctrl_cmd_msg)
-
+                ## waypoint를 확인한 후에 바로 eng_flag 확인하여 종료
                 if self.end_flag == 1:
                     redis_client.set('current_velocity', 0)
+                    print("is_detination")
+                    time.sleep(1)
+                    os.system("pkill -9 -ef rviz")
                     os.system("pkill -9 -ef Adaptive_Cruise_Control.launch")
-                    print("ok")
+                    ## break없어도 될듯
                     break
+
 
             rate.sleep()
 
@@ -249,7 +258,7 @@ class pure_pursuit:
 
     def get_current_waypoint(self, ego_status, global_path):
         min_dist = float('inf')
-        currnet_waypoint = 0
+        currnet_waypoint = -1
 
         ego_pose_x = ego_status[0]
         ego_pose_y = ego_status[1]
@@ -274,6 +283,7 @@ class pure_pursuit:
             redis_client.set('is_destination', 1)
             
             self.end_flag = 1
+            redis_client.set('current_velocity', 0)
         return currnet_waypoint
 
     ## npc 정보 확인해서 전방주시거리에 맞추서 주행
@@ -390,6 +400,8 @@ class pidControl:
         self.controlTime = 0.02
 
     def pid(self, target_vel, current_vel):
+        if target_vel >= 31:
+            target_vel = 60
         error = target_vel - current_vel
 
         # TODO: (5) PID 제어 생성
@@ -399,7 +411,8 @@ class pidControl:
 
         output = p_control + self.i_control + d_control
         self.prev_error = error
-
+        print("target", target_vel)
+        print("pid", p_control, self.i_control, d_control)
         return output
 
 
@@ -556,4 +569,3 @@ if __name__ == '__main__':
         test_track = pure_pursuit()
     except rospy.ROSInterruptException:
         pass
-

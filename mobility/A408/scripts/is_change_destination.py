@@ -13,8 +13,11 @@ while True:
     # get the value of 'destination_coordinate' key
     now_destination = redis_client.get('destination_coordinate')
     if now_destination != destination:
+        redis_client.set('is_destination', 0)
         os.system("pkill -9 -ef Adaptive_Cruise_Control.launch")
         destination = now_destination
         os.system("roslaunch ssafy_2 Adaptive_Cruise_Control.launch")
     
     time.sleep(1)
+
+

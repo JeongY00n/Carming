@@ -38,15 +38,19 @@ def openclose():
             set_duty_cycle(duty_cycle)
             time.sleep(0.03)
 
-        # 승객이 하차함을 확인 후
-        if redis_client.get('get_off') == b'1':
+        # 승객이 하차, 승차 함을 확인 후
+        while True:
+            get_off = redis_client.get('get_off')
+            get_in = redis_client.get('get_in')
+            if get_off == b'1' or get_in == b'1':
 
-            # 95도에서 0도로 3초간 문 닫힘
-            for angle in range(96, 0, -1):
-                # 각도를 duty cycle로 변환하여 PWM 출력, 일정한 속도로 동작
-                duty_cycle = 2.5 + (angle / 18.0)
-                set_duty_cycle(duty_cycle)
-                time.sleep(0.03)
+                # 95도에서 0도로 3초간 문 닫힘
+                for angle in range(96, 0, -1):
+                    # 각도를 duty cycle로 변환하여 PWM 출력, 일정한 속도로 동작
+                    duty_cycle = 2.5 + (angle / 18.0)
+                    set_duty_cycle(duty_cycle)
+                    time.sleep(0.03)
+                break;
 
     except KeyboardInterrupt:
         pass

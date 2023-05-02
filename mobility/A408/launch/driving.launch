@@ -1,10 +1,10 @@
 <launch>
-    <node pkg="ssafy_2" type="mgeo_pub.py" name="mgeo_pub"  />
-    <node pkg="ssafy_2" type="gpsimu_parser.py" name="gpsimu_parser" />
-    <node pkg="ssafy_2" type="make_path.py" name="mgeo_dijkstra_path" output="screen" />
-    <node pkg="ssafy_2" type="local_path_pub.py" name="local_path_pub" />
-    <node pkg="ssafy_2" type="acc.py" name="ACC"  output="screen"/>
-    <node pkg="ssafy_2" type="tf_pub.py" name="tf"  />
+    <node pkg="A408" type="mgeo_pub.py" name="mgeo_pub"  />
+    <node pkg="A408" type="gpsimu_parser.py" name="gpsimu_parser" />
+    <node pkg="A408" type="make_path.py" name="mgeo_dijkstra_path" output="screen" />
+    <node pkg="A408" type="local_path_pub.py" name="local_path_pub" />
+    <node pkg="A408" type="acc.py" name="ACC"  output="screen"/>
+    <node pkg="A408" type="tf_pub.py" name="tf"  />
 
-    <node pkg="rviz" type="rviz" name="rviz" args="-d $(find ssafy_2)/rviz/kcity_rviz.rviz" />
+    <node pkg="rviz" type="rviz" name="rviz" args="-d $(find A408)/rviz/kcity_rviz.rviz" />
 </launch>

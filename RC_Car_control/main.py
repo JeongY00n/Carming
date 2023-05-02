@@ -11,7 +11,7 @@ import re
 import tts
 import serial
 
-ser = serial.Serial('/dev/ttyACM1', 9600, exclusive=True)
+ser = serial.Serial('/dev/ttyACM0', 9600, exclusive=True)
 ## ls /dev/ttyA* 명령 입력해서 연결된 포트 확인하기
 ## 통신 중에 프로그램이 종료될 경우, ACM뒤의 포트 번호가 계속 올라간다.
 
@@ -23,20 +23,28 @@ class main():
 
     ## redis에서 데이터 확인
     def run(self):
-        start_flag = 0
+        
         redis_client = redis.StrictRedis(host='j8a408.p.ssafy.io', port=6379, db=0, password='carming123')
         
         try:
+            start_flag = 0
+            
             while True:
-                door_flag = 0
+                
                 ## 속도 b'1.4650933742523193' 형태로 출력
                 current_velocity = redis_client.get('current_velocity')
                 speed = re.findall(b'\d+', current_velocity)[0]  ### 정규식으로 바이트 문자열에서 숫자만 추출
-                speed = 7 * int(speed)  ## 모터의 출력율로 변환 (대충 20이하의 값이 나오므로 5배 처리)
+                speed = 10 * int(speed)  ## 모터의 출력율로 변환 (대충 20이하의 값이 나오므로 5배 처리)
+                
+                if speed >= 100:
+                    speed = 100
+                    
+                self.dc_motor.drive(speed)  # DC_MOTOR 객체의 drive 함수 호출
 
                 wheel_angle = redis_client.get('wheel_angle')
                 wheel_angle = float(wheel_angle.decode())
-                print(wheel_angle)
+
+                print('v : ' , current_velocity)
                 ## 왼쪽 -
                 ## 오른쪽 +
                 ## 직진 0
@@ -77,45 +85,53 @@ class main():
 
             
                 
-                
+                time.sleep(2)
                 get_in = redis_client.get('get_in')
+                get_off = redis_client.get('get_off')
                 is_destination = redis_client.get('is_destination')
                 #print('get_in : ', get_in)
                 #print('is_destination : ', is_destination)
                 
                 ## 차량이 사용자의 위치로 도착, 승차하기 전
                 ## 승차한 후 is_destination = 0, get_in = 1
-                if is_destination == b'1' and get_in == 0 and start_flag == 0:
-                    num = 4
-                    ser.write(num.to_bytes(1, 'little'))
+                if is_destination == b'1'  and get_in == b'0' and start_flag == 0:
+                    self.dc_motor.drive(0.0)
+                    self.servo_motor.steering(0)
+                    time.sleep(1)
                     tts.synthesize_text("안녕하세요! 카밍카 입니다! 승차해 주세요!")
-                    # 10초 뒤에 문열림
-                    time.sleep(10)
+                    # 3초 뒤에 문열림
                     openclose()
+                    while True:
+                        num = 4
+                        ser.write(num.to_bytes(1, 'little'))
+                        time.sleep(1)
+                        get_in = redis_client.get('get_in')
+                        if get_in == b'1':
+                            print("get_in")
+                            tts.synthesize_text("안전벨트를 매주세요!... 출발하겠습니다~")
+                            break
+                    redis_client.set('is_destination', 0)
                     start_flag = 1
-
-                ## 사용자가 탑승한 상황, 출발
-                if get_in == b'1':
-                    tts.synthesize_text("안전벨트를 매주세요!... 출발하겠습니다~")
-                    ## 주행 시작하면서 문열림 flag 초기화
 
 
                 
                 ## 사용자가 탑승한 차량이 목적지에 도착한 경우
-                if get_in == b'1' and is_destination == b'1' and door_flag == 0:
-                    num = 4
-                    ser.write(num.to_bytes(1, 'little'))
+                elif get_in == b'1' and is_destination == b'1' and start_flag == 1:
+                    self.dc_motor.drive(0.0)
+                    self.servo_motor.steering(0)
+                    time.sleep(1)
                     tts.synthesize_text("목적지에 도착하였습니다. 하차 준비를 하세요~")
-                    door_flag = 1
-                    # 1분뒤에 문열림
-                    time.sleep(10)
+                    # 3초 뒤에 문열림
                     openclose()
+                    while True:
+                        num = 4
+                        ser.write(num.to_bytes(1, 'little'))
+                        time.sleep(1)
+                        get_off = redis_client.get('get_off')
+                        if get_off == b'1':
+                            break
                     start_flag = 0
                             
-                self.dc_motor.drive(speed)  # DC_MOTOR 객체의 drive 함수 호출
-                
-                
-
                 ## 조향 자체가 어떻게 찍히는 지 확인해서 dutycycle 변수 입력
                 ##SERVO_MOTOR.steering(dutycycle)
 
@@ -136,4 +152,5 @@ if __name__ == "__main__":
 
     main = main()
     main.run()
+
 
