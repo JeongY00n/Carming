@@ -393,7 +393,11 @@ class pure_pursuit:
 class pidControl:
     def __init__(self):
         self.p_gain = 0.3
+        # 오래 멈춰있다가 이동하면 풀엑셀 밟을 수도 있음
+        # 그래서 0으로 설정
         self.i_gain = 0.00
+        # d는 오버슈팅 방지를 위한 것
+        # p와 i가 속도 제어를 위한 것
         self.d_gain = 0.03
         self.prev_error = 0
         self.i_control = 0
@@ -406,7 +410,7 @@ class pidControl:
 
         # TODO: (5) PID 제어 생성
         p_control = self.p_gain * error
-        self.i_control += self.i_gain * error * self.controlTime
+        self.i_control += error * self.controlTime
         d_control = self.d_gain * (error - self.prev_error) / self.controlTime
 
         output = p_control + self.i_control + d_control
